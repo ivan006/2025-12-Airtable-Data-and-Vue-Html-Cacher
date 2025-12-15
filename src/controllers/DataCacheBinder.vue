@@ -62,6 +62,31 @@
             </q-card-section>
         </q-card>
 
+        <!-- Attachment Progress -->
+        <q-card flat bordered class="q-mb-md">
+            <q-card-section>
+                <div class="text-subtitle1 q-mb-sm">Attachment Progress</div>
+
+                <q-linear-progress :value="attachmentProgress" color="green" stripe class="q-mb-sm" />
+
+                <div class="text-caption">
+                    {{ attachmentLoaded }} / {{ attachmentTotal }} attachments
+                </div>
+            </q-card-section>
+        </q-card>
+
+        <!-- Attachment Grid -->
+        <q-card flat bordered v-if="attachmentImages.length">
+            <q-card-section>
+                <div class="row q-col-gutter-sm">
+                    <div v-for="(img, i) in attachmentImages" :key="i" class="col-auto">
+                        <img :src="img" style="width:120px;height:120px;object-fit:cover;border-radius:6px" />
+                    </div>
+                </div>
+            </q-card-section>
+        </q-card>
+
+
         <!-- Existing Bound Caches -->
         <q-card flat bordered>
             <q-card-section>
@@ -99,16 +124,36 @@ export default {
             elapsedTime: '—',
             caches: [],
             columns: [
-                { name: 'file', label: 'File', field: 'file' },
+                {
+                    name: 'source_url',
+                    label: 'Source URL',
+                    field: row => row.source_url || row.file,
+                    sortable: true
+                },
                 {
                     name: 'size',
                     label: 'Size (KB)',
                     field: row => (row.size / 1024).toFixed(1),
                     align: 'right'
                 },
-                { name: 'created_at', label: 'Created', field: 'created_at' },
-                { name: 'actions', label: 'Actions', field: 'actions', align: 'right' }
-            ]
+                {
+                    name: 'created_at',
+                    label: 'Created',
+                    field: 'created_at'
+                },
+                {
+                    name: 'actions',
+                    label: 'Actions',
+                    field: 'actions',
+                    align: 'right'
+                }
+            ],
+            attachmentImages: [],
+            attachmentTotal: 0,
+            attachmentLoaded: 0,
+            attachmentProgress: 0,
+
+
         }
     },
 
@@ -117,6 +162,53 @@ export default {
     },
 
     methods: {
+        async touchAttachments(records, attachmentPath) {
+            if (!attachmentPath) return
+
+            const parts = attachmentPath.split('.')
+            const urls = []
+
+            // extract URLs (same logic as old)
+            records.forEach(r => {
+                let val = r.fields
+                for (const p of parts) {
+                    const m = p.match(/^(.+)\[(\d+)\]$/)
+                    if (m) {
+                        val = Array.isArray(val?.[m[1]]) ? val[m[1]][+m[2]] : null
+                    } else {
+                        val = val?.[p]
+                    }
+                }
+
+                if (Array.isArray(val)) {
+                    val.forEach(v => urls.push(v.url || v))
+                } else if (typeof val === 'string') {
+                    urls.push(val)
+                }
+            })
+
+            this.attachmentImages = []
+            this.attachmentTotal = urls.length
+            this.attachmentLoaded = 0
+            this.attachmentProgress = 0
+
+            const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
+            for (const url of urls) {
+                const proxied = `${CACHE_BASE}/data-cache/index.php?url=${encodeURIComponent(url)}`
+                const img = new Image()
+                img.src = proxied
+
+                await new Promise(res => {
+                    img.onload = img.onerror = () => {
+                        this.attachmentLoaded++
+                        this.attachmentProgress =
+                            this.attachmentLoaded / this.attachmentTotal
+                        this.attachmentImages.unshift(proxied)
+                        res()
+                    }
+                })
+            }
+        },
         async fetchAllPages(url) {
             let records = []
             let offset = null
@@ -135,7 +227,7 @@ export default {
                 const res = await fetch(
                     `${CACHE_BASE}/data-cache/index.php?regenerate=${encodeURIComponent(pageUrl)}`
                 )
-                
+
                 const data = await res.json()
 
                 records.push(...(data.records || []))
@@ -158,16 +250,24 @@ export default {
 
             this.loading = true
             this.status = 'Starting compilation…'
-            this.pagesFetched = '0'
+            this.pagesFetched = 0
             this.elapsedTime = '0s'
 
             try {
-                const start = performance.now()
-                const records = await this.fetchAllPages(this.apiUrl)
-                const duration = ((performance.now() - start) / 1000).toFixed(2)
+                const start = Date.now()
 
-                this.status = `Saving ${records.length} records…`
-                
+                // 1️⃣ Fetch all pages (DATA)
+                const records = await this.fetchAllPages(this.apiUrl)
+
+                // 2️⃣ Touch attachments (IMAGES)
+                if (this.attachmentPath) {
+                    this.status = 'Caching attachments…'
+                    await this.touchAttachments(records, this.attachmentPath)
+                }
+
+                // 3️⃣ Save bound cache (JSON)
+                const duration = ((Date.now() - start) / 1000).toFixed(2)
+
                 const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
                 await fetch(
                     `${CACHE_BASE}/data-cache/bound-cache.php?action=save&url=${encodeURIComponent(this.apiUrl)}`,
