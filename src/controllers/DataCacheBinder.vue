@@ -131,9 +131,11 @@ export default {
                     ? `${url}&offset=${encodeURIComponent(offset)}`
                     : url
 
+                const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
                 const res = await fetch(
-                    `/data-cache/index.php?regenerate=${encodeURIComponent(pageUrl)}`
+                    `${CACHE_BASE}/data-cache/index.php?regenerate=${encodeURIComponent(pageUrl)}`
                 )
+                
                 const data = await res.json()
 
                 records.push(...(data.records || []))
@@ -165,9 +167,10 @@ export default {
                 const duration = ((performance.now() - start) / 1000).toFixed(2)
 
                 this.status = `Saving ${records.length} records…`
-
+                
+                const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
                 await fetch(
-                    `/data-cache/bound-cache.php?action=save&url=${encodeURIComponent(this.apiUrl)}`,
+                    `${CACHE_BASE}/data-cache/bound-cache.php?action=save&url=${encodeURIComponent(this.apiUrl)}`,
                     {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -186,14 +189,16 @@ export default {
         },
 
         async listCaches() {
-            const res = await fetch('/data-cache/bound-cache.php?action=list')
+            const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
+            const res = await fetch(`${CACHE_BASE}/data-cache/bound-cache.php?action=list`)
             this.caches = await res.json()
         },
 
         viewCache(url) {
+            const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
             if (!url) return
             window.open(
-                `/data-cache/bound-cache.php?action=get&url=${encodeURIComponent(url)}`,
+                `${CACHE_BASE}/data-cache/bound-cache.php?action=get&url=${encodeURIComponent(url)}`,
                 '_blank'
             )
         }
