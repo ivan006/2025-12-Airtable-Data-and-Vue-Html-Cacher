@@ -72,18 +72,20 @@
                 </div>
 
                 <q-table flat bordered dense row-key="file" :rows="caches" :columns="columns"
-                    no-data-label="No bound caches found">
+                    no-data-label="No bound caches found" table-style="table-layout: fixed; width: 100%;" hide-bottom>
                     <template v-slot:body-cell-actions="props">
                         <q-td align="right">
                             <q-btn size="sm" flat label="View" @click="viewCache(props.row.source_url)" />
+                            <q-btn size="sm" flat color="negative" label="Delete" @click="deleteCache(props.row)" />
                         </q-td>
                     </template>
+
                 </q-table>
 
             </q-card-section>
         </q-card>
 
-        
+
 
         <!-- Attachment Progress -->
         <q-card flat bordered class="q-mb-md">
@@ -125,30 +127,30 @@ export default {
             pagesFetched: '—',
             elapsedTime: '—',
             caches: [],
-            columns: [
-                {
-                    name: 'source_url',
-                    label: 'Source URL',
-                    field: row => row.source_url || row.file,
-                    sortable: true
-                },
-                {
-                    name: 'size',
-                    label: 'Size (KB)',
-                    field: row => (row.size / 1024).toFixed(1),
-                    align: 'right'
-                },
-                {
-                    name: 'created_at',
-                    label: 'Created',
-                    field: 'created_at'
-                },
-                {
-                    name: 'actions',
-                    label: 'Actions',
-                    field: 'actions',
-                    align: 'right'
-                }
+            columns: [{
+                name: 'source_url',
+                label: 'Source URL',
+                field: row => row.source_url || row.file,
+                style: 'white-space: normal; word-break: break-all;',
+            },
+            {
+                name: 'size',
+                label: 'Size (KB)',
+                field: row => (row.size / 1024).toFixed(1),
+                align: 'right'
+            },
+            {
+                name: 'created_at',
+                label: 'Created',
+                field: 'created_at'
+            },
+            {
+                name: 'actions',
+                label: 'Actions',
+                align: 'right',
+                style: 'width: 120px;'
+            },
+
             ],
             attachmentImages: [],
             attachmentTotal: 0,
@@ -164,6 +166,35 @@ export default {
     },
 
     methods: {
+        async deleteCache(row) {
+            if (!row?.file) return
+
+            if (!confirm(`Delete bound cache?\n\n${row.source_url || row.file}`)) {
+                return
+            }
+
+            this.status = `🗑️ Deleting cache…`
+            this.loading = true
+
+            try {
+                const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
+                const res = await fetch(
+                    `${CACHE_BASE}/data-cache/bound-cache.php?action=delete&file=${encodeURIComponent(row.file)}`
+                )
+                const data = await res.json()
+
+                if (data.deleted) {
+                    this.status = '✅ Cache deleted'
+                    await this.listCaches()
+                } else {
+                    this.status = '⚠️ Could not delete cache'
+                }
+            } catch (e) {
+                this.status = `❌ Error deleting cache: ${e.message}`
+            } finally {
+                this.loading = false
+            }
+        },
         async touchAttachments(records, attachmentPath) {
             if (!attachmentPath) return
 
