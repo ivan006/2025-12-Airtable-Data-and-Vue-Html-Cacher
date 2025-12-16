@@ -1,6 +1,6 @@
 <?php
 // Base directory = site root (one level above /html-cache)
-$base = dirname(__DIR__);
+$base = dirname(__DIR__, 2);
 
 /**
  * Recursively remove a directory
