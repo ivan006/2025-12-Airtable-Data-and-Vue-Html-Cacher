@@ -19,32 +19,28 @@
             </q-card-section>
         </q-card>
 
-        <!-- SOURCE TABS -->
+        <!-- Tabs -->
         <q-card flat bordered class="q-mb-md">
-            <q-card-section>
+            <q-tabs v-model="activeTab" dense>
+                <q-tab name="pages" label="Pages" />
+                <q-tab v-for="(s, i) in sitemaps" :key="i" :name="'sitemap-' + i" :label="s.split('/').pop()" />
+            </q-tabs>
 
-                <q-tabs v-model="activeTab" dense class="text-grey" active-color="primary" indicator-color="primary">
-                    <q-tab name="pages" label="Pages.json" />
-                    <q-tab v-for="(s, i) in sitemaps" :key="i" :name="`sitemap-${i}`" :label="s.title" />
-                </q-tabs>
+            <q-separator />
 
-                <q-separator class="q-my-md" />
+            <q-tab-panels v-model="activeTab" animated>
 
                 <!-- Pages.json -->
-                <div v-if="activeTab === 'pages'">
-                    <q-option-group v-model="selected" type="checkbox" :options="pageOptions" dense />
+                <q-tab-panel name="pages">
+                    <HtmlCacheSelectableList v-model="selected" :options="pageOptions" />
+                </q-tab-panel>
 
-                    <div class="text-caption text-grey q-mt-sm">
-                        Homepage is always available. Other pages come from <code>pages.json</code>.
-                    </div>
-                </div>
+                <!-- Sitemaps -->
+                <q-tab-panel v-for="(s, i) in sitemaps" :key="i" :name="'sitemap-' + i">
+                    <HtmlCacheSelectableList v-model="selected" :sitemap-url="s" />
+                </q-tab-panel>
 
-                <!-- Sitemap Tabs -->
-                <div v-for="(s, i) in sitemaps" :key="i" v-show="activeTab === `sitemap-${i}`">
-                    <SitemapSelector :sitemap-url="s.url" @update:selected="selected = $event" />
-                </div>
-
-            </q-card-section>
+            </q-tab-panels>
         </q-card>
 
         <!-- Actions -->
@@ -84,24 +80,24 @@
 </template>
 
 <script>
-import SitemapSelector from './SitemapSelector.vue'
+import HtmlCacheSelectableList from './HtmlCacheSelectableList.vue'
 
 export default {
     name: 'HtmlCachePages',
 
     components: {
-        SitemapSelector
+        HtmlCacheSelectableList
     },
 
     data() {
         return {
             activeTab: 'pages',
             pageOptions: [{ label: 'Homepage', value: '' }],
+            sitemaps: [],
             selected: [],
             loading: false,
             status: '',
-            currentUrl: '',
-            sitemaps: []
+            currentUrl: ''
         }
     },
 
@@ -135,14 +131,10 @@ export default {
         async loadSitemaps() {
             try {
                 const res = await fetch(`${this.cacheBase()}/html-cache/sitemaps.json`)
-                const data = await res.json()
-
-                this.sitemaps = (data.sitemaps || []).map(url => ({
-                    url,
-                    title: url.split('/').pop()
-                }))
+                const json = await res.json()
+                this.sitemaps = json.sitemaps || []
             } catch {
-                // sitemap support is optional
+                this.sitemaps = []
             }
         },
 
@@ -166,7 +158,10 @@ export default {
             this.loading = true
 
             for (const slug of this.selected) {
-                this.status = await this.post({ action: 'delete', slug })
+                this.status = await this.post({
+                    action: 'delete',
+                    slug
+                })
             }
 
             this.loading = false
@@ -180,9 +175,7 @@ export default {
             const base = window.location.origin
 
             for (const slug of this.selected) {
-                const path = slug.replace(/^\/|\/$/g, '')
-                const url = path ? `${base}/${path}/` : `${base}/`
-
+                const url = slug ? `${base}/${slug}/` : `${base}/`
                 this.currentUrl = url
                 iframe.src = url
 
@@ -192,10 +185,9 @@ export default {
                             try {
                                 const html = iframe.contentDocument.documentElement.outerHTML
                                 const encoded = btoa(unescape(encodeURIComponent(html)))
-
                                 this.status = await this.post({
                                     action: 'save',
-                                    slug: path,
+                                    slug,
                                     html: encoded
                                 })
                             } catch {
