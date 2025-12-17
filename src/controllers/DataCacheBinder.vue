@@ -201,7 +201,7 @@ export default {
             const parts = attachmentPath.split('.')
             const urls = []
 
-            // extract URLs (same logic as old)
+            // extract URLs (unchanged logic)
             records.forEach(r => {
                 let val = r.fields
                 for (const p of parts) {
@@ -226,21 +226,26 @@ export default {
             this.attachmentProgress = 0
 
             const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
-            for (const url of urls) {
-                const proxied = `${CACHE_BASE}/data-cache/index.php?url=${encodeURIComponent(url)}`
-                const img = new Image()
-                img.src = proxied
 
-                await new Promise(res => {
+            // 🔥 PARALLEL IMAGE TOUCHING
+            const promises = urls.map(url => {
+                return new Promise(resolve => {
+                    const proxied = `${CACHE_BASE}/data-cache/index.php?url=${encodeURIComponent(url)}`
+                    const img = new Image()
+                    img.src = proxied
+
                     img.onload = img.onerror = () => {
                         this.attachmentLoaded++
                         this.attachmentProgress =
                             this.attachmentLoaded / this.attachmentTotal
                         this.attachmentImages.unshift(proxied)
-                        res()
+                        resolve()
                     }
                 })
-            }
+            })
+
+            // wait for all (optional – remove if you want pure fire-and-forget)
+            await Promise.all(promises)
         },
         async fetchAllPages(url) {
             let records = []
