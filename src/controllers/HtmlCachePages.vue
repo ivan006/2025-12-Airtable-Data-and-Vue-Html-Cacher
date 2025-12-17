@@ -32,12 +32,12 @@
 
                 <!-- Pages.json -->
                 <q-tab-panel name="pages">
-                    <HtmlCacheSelectableList v-model="selected" :options="pageOptions" />
+                    <HtmlCachePageHelper v-model="selected" :options="pageOptions" />
                 </q-tab-panel>
 
                 <!-- Sitemaps -->
                 <q-tab-panel v-for="(s, i) in sitemaps" :key="i" :name="'sitemap-' + i">
-                    <HtmlCacheSelectableList v-model="selected" :sitemap-url="s" />
+                    <HtmlCachePageHelper v-model="selected" :sitemap-url="s" />
                 </q-tab-panel>
 
             </q-tab-panels>
@@ -80,13 +80,13 @@
 </template>
 
 <script>
-import HtmlCacheSelectableList from './HtmlCacheSelectableList.vue'
+import HtmlCachePageHelper from './HtmlCachePageHelper.vue'
 
 export default {
     name: 'HtmlCachePages',
 
     components: {
-        HtmlCacheSelectableList
+        HtmlCachePageHelper
     },
 
     data() {

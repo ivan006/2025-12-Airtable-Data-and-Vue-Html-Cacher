@@ -182,7 +182,7 @@ Main UI components:
 
 * `DataCacheBinder.vue`
 * `HtmlCachePages.vue`
-* `SitemapUrlList.vue`
+* `HtmlCachePageHelper.vue`
 
 ---
 
