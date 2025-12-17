@@ -1,39 +1,52 @@
 <template>
     <div style="max-height: 420px; overflow-y: auto">
 
-        <!-- Select All -->
-        <q-item clickable @click="toggleAll">
-            <q-item-section>
-                <strong>
-                    {{ allSelected ? 'Unselect all' : 'Select all' }}
-                </strong>
-            </q-item-section>
-        </q-item>
+        <!-- EACH SITEMAP SECTION -->
+        <div v-for="section in sections" :key="section.key" class="q-mb-md">
 
-        <q-separator />
 
-        <!-- Groups of 10 -->
-        <div v-for="(group, gIdx) in groupedItems" :key="gIdx">
-            <q-item clickable class="bg-grey-2" @click="toggleGroup(group)">
+            <!-- Section Header -->
+            <q-item class="bg-grey-3">
+                <q-item-section>
+                    <strong>{{ section.label }}</strong>
+                </q-item-section>
+            </q-item>
+
+            <!-- Select All (per sitemap) -->
+            <q-item clickable @click="toggleAll(section)">
                 <q-item-section>
                     <strong>
-                        Group {{ gIdx + 1 }}
-                        ({{ groupSelectedCount(group) }}/{{ group.length }})
+                        {{ allSelected(section) ? 'Unselect all' : 'Select all' }}
                     </strong>
                 </q-item-section>
             </q-item>
 
-            <q-item v-for="item in group" :key="item.value" clickable @click="toggle(item.value)">
-                <q-item-section>
-                    {{ item.label }}
-                </q-item-section>
-                <q-item-section side>
-                    <q-checkbox :model-value="modelValue.includes(item.value)"
-                        @update:model-value="toggle(item.value)" />
-                </q-item-section>
-            </q-item>
-
             <q-separator />
+
+            <!-- Groups of 10 -->
+            <div v-for="(group, gIdx) in grouped(section.items)" :key="gIdx">
+                <q-item clickable class="bg-grey-2" @click="toggleGroup(section, group)">
+                    <q-item-section>
+                        <strong>
+                            Group {{ gIdx + 1 }}
+                            ({{ groupSelectedCount(group) }}/{{ group.length }})
+                        </strong>
+                    </q-item-section>
+                </q-item>
+
+                <q-item v-for="item in group" :key="item.value" clickable @click="toggle(item.value)">
+                    <q-item-section>
+                        {{ item.label }}
+                    </q-item-section>
+                    <q-item-section side>
+                        <q-checkbox :model-value="modelValue.includes(item.value)"
+                            @update:model-value="toggle(item.value)" />
+                    </q-item-section>
+                </q-item>
+
+                <q-separator />
+            </div>
+
         </div>
 
     </div>
@@ -64,22 +77,7 @@ export default {
 
     data() {
         return {
-            items: []
-        }
-    },
-
-    computed: {
-        groupedItems() {
-            const groups = []
-            for (let i = 0; i < this.items.length; i += 10) {
-                groups.push(this.items.slice(i, i + 10))
-            }
-            return groups
-        },
-
-        allSelected() {
-            return this.items.length &&
-                this.items.every(i => this.modelValue.includes(i.value))
+            sections: []
         }
     },
 
@@ -87,7 +85,11 @@ export default {
         if (this.sitemapUrl) {
             await this.loadSitemap(this.sitemapUrl)
         } else {
-            this.items = this.options
+            this.sections = [{
+                key: 'pages',
+                label: 'Pages',
+                items: this.options
+            }]
         }
     },
 
@@ -102,13 +104,32 @@ export default {
             this.emit([...set])
         },
 
-        toggleAll() {
-            this.allSelected
-                ? this.emit([])
-                : this.emit(this.items.map(i => i.value))
+        grouped(items) {
+            const groups = []
+            for (let i = 0; i < items.length; i += 10) {
+                groups.push(items.slice(i, i + 10))
+            }
+            return groups
         },
 
-        toggleGroup(group) {
+        allSelected(section) {
+            return section.items.length &&
+                section.items.every(i => this.modelValue.includes(i.value))
+        },
+
+        toggleAll(section) {
+            const set = new Set(this.modelValue)
+
+            if (this.allSelected(section)) {
+                section.items.forEach(i => set.delete(i.value))
+            } else {
+                section.items.forEach(i => set.add(i.value))
+            }
+
+            this.emit([...set])
+        },
+
+        toggleGroup(section, group) {
             const set = new Set(this.modelValue)
             const allInGroup = group.every(i => set.has(i.value))
 
@@ -129,6 +150,7 @@ export default {
 
             const sitemapNodes = [...doc.querySelectorAll('sitemap > loc')]
 
+            // SITEMAP INDEX → MULTIPLE SECTIONS
             if (sitemapNodes.length) {
                 for (const n of sitemapNodes) {
                     await this.loadSitemap(n.textContent)
@@ -136,9 +158,10 @@ export default {
                 return
             }
 
+            // NORMAL URLSET
             const urls = [...doc.querySelectorAll('url > loc')]
 
-            const parsed = urls.map((n, i) => {
+            const items = urls.map((n, i) => {
                 const path = new URL(n.textContent).pathname.replace(/\/$/, '')
                 return {
                     label: `${i + 1}. ${path}/`,
@@ -146,7 +169,11 @@ export default {
                 }
             })
 
-            this.items.push(...parsed)
+            this.sections.push({
+                key: url,
+                label: url.split('/').pop(),
+                items
+            })
         }
     }
 }

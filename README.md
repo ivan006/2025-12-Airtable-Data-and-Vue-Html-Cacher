@@ -1,7 +1,3 @@
-Absolutely — here is the **clean, corrected, final README** with the **exact title**, **correct deployment model**, and **Vue + Airtable focus** preserved.
-
----
-
 # 🧊 2025-12-Airtable-Data-and-Vue-Html-Cacher
 
 A **Vue-based caching service** for websites built with **Vue + Airtable**, designed to improve **performance, SEO, and stability** by caching both **API data** and **fully rendered HTML pages**.
