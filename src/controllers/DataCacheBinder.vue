@@ -75,7 +75,7 @@
 
                         <div class="row q-col-gutter-md items-center text-body2">
                             <div class="col-auto">
-                                Pages fetched: <strong>{{ pagesFetched }}</strong>
+                                Items fetched: <strong>{{ itemsFetched }}</strong>
                             </div>
 
                             <div class="col-auto">
@@ -140,7 +140,7 @@ export default {
             attachmentPath: '',
             loading: false,
             status: '',
-            pagesFetched: '—',
+            itemsFetched: '—',
             elapsedTime: '—',
             caches: [],
             columns: [{
@@ -288,7 +288,7 @@ export default {
                 offset = data.offset
                 page++
 
-                this.pagesFetched = records.length
+                this.itemsFetched = records.length
                 this.elapsedTime = `${Math.floor((Date.now() - start) / 1000)}s`
 
             } while (offset)
@@ -304,7 +304,7 @@ export default {
 
             this.loading = true
             this.status = 'Checking for existing bound cache…'
-            this.pagesFetched = 0
+            this.itemsFetched = 0
             this.elapsedTime = '0s'
 
             try {
@@ -336,7 +336,7 @@ export default {
                     )
                     const data = await res.json()
                     records = data.records || []
-                    this.pagesFetched = records.length
+                    this.itemsFetched = records.length
                 } else {
                     // 🔹 ORIGINAL FLOW (UNCHANGED)
                     this.status = 'Starting compilation…'
