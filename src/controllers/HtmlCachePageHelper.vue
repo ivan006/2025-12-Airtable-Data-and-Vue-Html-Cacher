@@ -182,6 +182,19 @@ export default {
                 items
             })
         }
+    },
+    watch: {
+        activeTab(newTab, oldTab) {
+            if (!oldTab) return
+
+            const oldSection = this.sections.find(s => s.key === oldTab)
+            if (!oldSection) return
+
+            const set = new Set(this.modelValue)
+            oldSection.items.forEach(i => set.delete(i.value))
+            this.emit([...set])
+        }
     }
+
 }
 </script>
