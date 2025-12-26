@@ -92,13 +92,10 @@ switch ($action) {
         $url = $_GET['url'] ?? null;
         $fileParam = $_GET['file'] ?? null;
 
-        // 🧠 Determine file path
         if ($url) {
-            // When fetching by URL, generate the same hash used when saving
             $hash = hash('sha256', $url);
             $path = "$dir/bound-$hash.json";
         } elseif ($fileParam) {
-            // Fallback: still support direct file fetch (legacy)
             $path = "$dir/$fileParam";
         } else {
             http_response_code(400);
@@ -112,9 +109,30 @@ switch ($action) {
             exit;
         }
 
+        // ✅ Cache headers
+        $lastModified = filemtime($path);
+        $etag = '"' . md5_file($path) . '"';
+
         header('Content-Type: application/json; charset=utf-8');
-        echo file_get_contents($path);
+        header('Cache-Control: public, max-age=86400'); // 24h (safe default)
+        header('ETag: ' . $etag);
+        header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
+
+        // ✅ Conditional GET
+        $ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? null;
+        $ifModifiedSince = $_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? null;
+
+        if (
+            ($ifNoneMatch && $ifNoneMatch === $etag) ||
+            ($ifModifiedSince && strtotime($ifModifiedSince) >= $lastModified)
+        ) {
+            http_response_code(304);
+            exit;
+        }
+
+        readfile($path);
         break;
+
 
 
 
