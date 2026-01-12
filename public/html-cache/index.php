@@ -125,6 +125,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $html
         );
 
+        $html = preg_replace(
+            '/<script[^>]+src=["\']https:\/\/www\.googletagmanager\.com\/gtag\/js[^"\']*["\'][^>]*>\s*<\/script>/i',
+            '',
+            $html
+        );
+
+        $html = preg_replace(
+            '/<script>\s*\(function\(w,d,s,l,i\)\{.*?googletagmanager\.com\/gtm\.js.*?\}\)\(window,document,.*?\);\s*<\/script>/is',
+            '',
+            $html
+        );
+
+
+
         file_put_contents($file, $html);
 
         echo "✅ Saved to " . ($slug === '' ? '/index.html' : "/$slug/index.html");
