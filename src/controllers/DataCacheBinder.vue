@@ -350,7 +350,8 @@ export default {
 
                 for (const url of urls) {
                     await fetch(
-                        `${CACHE_BASE}/data-cache/index.php?action=delete&url=${encodeURIComponent(url)}`
+
+                        `${CACHE_BASE}/data-cache/index.php?delete=${encodeURIComponent(url)}`
                     )
                     deleted++
                 }
