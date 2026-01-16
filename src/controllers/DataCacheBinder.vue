@@ -371,6 +371,81 @@ export default {
                 this.loading = false
             }
         },
+        async startCompilation() {
+            if (!this.apiUrl) {
+                this.status = 'Please enter an Airtable API URL.'
+                return
+            }
+
+            this.loading = true
+            this.status = 'Checking for existing bound cache…'
+            this.itemsFetched = 0
+            this.elapsedTime = '0s'
+
+            try {
+                const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
+
+                // 🔹 CHECK EXISTING BOUND CACHE (minimal)
+                const list = await fetch(
+                    `${CACHE_BASE}/data-cache/bound-cache.php?action=list`
+                ).then(r => r.json())
+
+                const hashBuffer = await crypto.subtle.digest(
+                    'SHA-256',
+                    new TextEncoder().encode(this.apiUrl)
+                )
+                const hashHex = [...new Uint8Array(hashBuffer)]
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('')
+                const filename = `bound-${hashHex}.json`
+
+                const existing = list.find(c => c.file === filename)
+
+                let records
+
+                if (existing) {
+                    // ✅ USE EXISTING CACHE
+                    this.status = 'Using existing bound cache…'
+                    const res = await fetch(
+                        `${CACHE_BASE}/data-cache/bound-cache.php?action=get&url=${encodeURIComponent(this.apiUrl)}`
+                    )
+                    const data = await res.json()
+                    records = data.records || []
+                    this.itemsFetched = records.length
+                } else {
+                    // 🔹 ORIGINAL FLOW (UNCHANGED)
+                    this.status = 'Starting compilation…'
+                    const start = Date.now()
+
+                    records = await this.fetchAllPages(this.apiUrl)
+
+                    const duration = ((Date.now() - start) / 1000).toFixed(2)
+
+                    await fetch(
+                        `${CACHE_BASE}/data-cache/bound-cache.php?action=save&url=${encodeURIComponent(this.apiUrl)}`,
+                        {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ records, duration })
+                        }
+                    )
+                }
+
+                // 🔹 ATTACHMENTS (UNCHANGED)
+                if (this.attachmentPath) {
+                    this.status = 'Caching attachments…'
+                    await this.touchAttachments(records, this.attachmentPath)
+                }
+
+                this.status = `✅ Done (${records.length} records)`
+                this.listCaches()
+
+            } catch (e) {
+                this.status = `❌ Error: ${e.message}`
+            } finally {
+                this.loading = false
+            }
+        },
 
         async listCaches() {
             const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
