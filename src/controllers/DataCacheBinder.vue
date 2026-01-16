@@ -36,6 +36,10 @@
                 <q-btn label="Start Compilation" color="primary" unelevated :loading="loading"
                     @click="startCompilation" />
 
+                <q-btn label="Clear Attachment Cache" color="negative" flat :loading="loading"
+                    @click="clearAttachmentCache" />
+
+
             </q-card-section>
         </q-card>
 
@@ -296,77 +300,65 @@ export default {
             return records
         },
 
-        async startCompilation() {
-            if (!this.apiUrl) {
-                this.status = 'Please enter an Airtable API URL.'
+        async clearAttachmentCache() {
+            if (!this.attachmentPath) {
+                this.status = 'No attachment path provided.'
+                return
+            }
+
+            if (!confirm('Clear cached attachments for this dataset?')) {
                 return
             }
 
             this.loading = true
-            this.status = 'Checking for existing bound cache…'
-            this.itemsFetched = 0
-            this.elapsedTime = '0s'
+            this.status = 'Clearing attachment cache…'
 
             try {
+                // Load records the same way compilation does
                 const CACHE_BASE = import.meta.env.VITE_CACHE_BASE || ''
 
-                // 🔹 CHECK EXISTING BOUND CACHE (minimal)
-                const list = await fetch(
-                    `${CACHE_BASE}/data-cache/bound-cache.php?action=list`
-                ).then(r => r.json())
-
-                const hashBuffer = await crypto.subtle.digest(
-                    'SHA-256',
-                    new TextEncoder().encode(this.apiUrl)
+                const res = await fetch(
+                    `${CACHE_BASE}/data-cache/bound-cache.php?action=get&url=${encodeURIComponent(this.apiUrl)}`
                 )
-                const hashHex = [...new Uint8Array(hashBuffer)]
-                    .map(b => b.toString(16).padStart(2, '0'))
-                    .join('')
-                const filename = `bound-${hashHex}.json`
+                const data = await res.json()
+                const records = data.records || []
 
-                const existing = list.find(c => c.file === filename)
+                // 🔁 SAME PATH RESOLUTION LOGIC
+                const parts = this.attachmentPath.split('.')
+                const urls = []
 
-                let records
-
-                if (existing) {
-                    // ✅ USE EXISTING CACHE
-                    this.status = 'Using existing bound cache…'
-                    const res = await fetch(
-                        `${CACHE_BASE}/data-cache/bound-cache.php?action=get&url=${encodeURIComponent(this.apiUrl)}`
-                    )
-                    const data = await res.json()
-                    records = data.records || []
-                    this.itemsFetched = records.length
-                } else {
-                    // 🔹 ORIGINAL FLOW (UNCHANGED)
-                    this.status = 'Starting compilation…'
-                    const start = Date.now()
-
-                    records = await this.fetchAllPages(this.apiUrl)
-
-                    const duration = ((Date.now() - start) / 1000).toFixed(2)
-
-                    await fetch(
-                        `${CACHE_BASE}/data-cache/bound-cache.php?action=save&url=${encodeURIComponent(this.apiUrl)}`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ records, duration })
+                records.forEach(r => {
+                    let val = r.fields
+                    for (const p of parts) {
+                        const m = p.match(/^(.+)\[(\d+)\]$/)
+                        if (m) {
+                            val = Array.isArray(val?.[m[1]]) ? val[m[1]][+m[2]] : null
+                        } else {
+                            val = val?.[p]
                         }
+                    }
+
+                    if (Array.isArray(val)) {
+                        val.forEach(v => urls.push(v.url || v))
+                    } else if (typeof val === 'string') {
+                        urls.push(val)
+                    }
+                })
+
+                // 🔥 DELETE EACH CACHED FILE
+                let deleted = 0
+
+                for (const url of urls) {
+                    await fetch(
+                        `${CACHE_BASE}/data-cache/index.php?action=delete&url=${encodeURIComponent(url)}`
                     )
+                    deleted++
                 }
 
-                // 🔹 ATTACHMENTS (UNCHANGED)
-                if (this.attachmentPath) {
-                    this.status = 'Caching attachments…'
-                    await this.touchAttachments(records, this.attachmentPath)
-                }
-
-                this.status = `✅ Done (${records.length} records)`
-                this.listCaches()
+                this.status = `🧹 Cleared ${deleted} attachment caches`
 
             } catch (e) {
-                this.status = `❌ Error: ${e.message}`
+                this.status = `❌ Failed: ${e.message}`
             } finally {
                 this.loading = false
             }
