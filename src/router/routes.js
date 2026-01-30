@@ -24,7 +24,7 @@ const routes = [
         meta: { requiresAuth: false }
       },
       {
-        path: 'data-acceptance',
+        path: 'data-acceptance-page',
         component: () => import('src/controllers/HomeComponent.vue'),
         meta: { requiresAuth: false }
       }

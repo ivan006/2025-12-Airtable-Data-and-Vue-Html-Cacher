@@ -33,7 +33,7 @@
           </q-item-section>
         </q-item>
 
-        <q-item clickable to="/data-acceptance">
+        <q-item clickable to="/data-acceptance-page">
           <q-item-section>
             Data Acceptance
           </q-item-section>
