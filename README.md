@@ -1,4 +1,4 @@
-# Superstack Integrators - For Wordpress, Airtable and Vue
+# Ivan's Jamstack and Portal Integrator - For Wordpress, Airtable and Vue
 
 ## Overview
 
@@ -12,7 +12,7 @@ This approach prioritises rapid development, lower cost, and experimentation. By
 
 portal -> data acceptance -> cms -> data caching -> site -> html caching -> seo
 
-## 🧊 Data and Page
+## Jamstack Intergration (JSON and HTML caching)
 
 A **Vue-based caching service** for websites built with **Vue + Airtable**, designed to improve **performance, SEO, and stability** by caching both **API data** and **fully rendered HTML pages**.
 
@@ -218,35 +218,59 @@ This is a **pragmatic, site-owned caching layer**.
 - Airtable is flexible — but rate-limited
 - This service bridges the gap **without changing your app architecture**
 
-## Data Acceptance (IRIS — Ivan’s Robust Integration System)
+## Portal integration (Data Acceptance)
 
 ### Philosophy
 
-**IRIS is a relationship-first integration system.**
+**We will use a relationship-first integration model.**
 
 Most integrations sync records.
 Very few sync **relationships** — even though relationships are a **critical** part of any real integration.
 
-IRIS exists to treat relationships as first-class concerns.
+Our model is about treating relationships as first-class concerns.
 
 ---
 
-#### What IRIS Does
+#### What our approach Does
 
 **Relationship Syncing (Primary)**
-IRIS syncs relationships by assigning entities a stable internal identity and translating foreign keys between systems at sync time, rather than leaking IDs across schemas.
+our approach syncs relationships by assigning entities a stable internal identity and translating foreign keys between systems at sync time, rather than leaking IDs across schemas.
 This allows each system to use its own native identifiers while relationships remain correct.
 
 **Revision Tracking (Secondary)**
-Because entities have stable identity, IRIS can diff changes, commit them, and maintain a revision history.
+Because entities have stable identity, we can diff changes, commit them, and maintain a revision history.
 This capability naturally emerges from the same foundation used for relationship syncing.
 
 **Intervention Mode (Optional)**
-IRIS can require **moderator approval** before changes are committed, enabling controlled, review-based integrations.
+We can require **moderator approval** before changes are committed, enabling controlled, review-based integrations.
 
 ---
 
 #### Notes
 
-- IRIS also supports **image and media syncing** (adapter-specific where necessary)
+- We also supports **image and media syncing** (adapter-specific where necessary)
 - The system is **target- and source-agnostic**, where practical
+
+### Development Milestones
+
+The integration layer is designed to grow incrementally, with each milestone unlocking a new class of synchronization capability while keeping complexity contained.
+
+**Milestone 1 – Registry-Assisted Syncing**  
+Introduce a registry table that maps source records to target records across systems, decoupling external IDs from source data and enabling reliable, re-runnable syncs and foreign-key translation.
+
+**Milestone 2 – Syncing Special Fields**  
+Handle non-scalar fields that require custom logic rather than simple value copying.
+
+- _Image Syncing_: pass attachment URLs directly to the target system and let it ingest assets natively.
+- _Relationship Syncing_: use the registry to resolve and translate foreign keys between systems before linking records.
+
+**Milestone 3 – Reverse Syncing with Ownership**  
+Enable syncing from Airtable back to WordPress while respecting listing ownership, ensuring records are assigned to the correct contributor so they remain editable in the portal.
+
+**Milestone 4 – Syncing Frivolous Fields**  
+Add lower-priority enrichments that improve UX but do not block core flows.
+
+- _Location Fields_: lightweight parsing and enrichment of place data without full geographic normalization.
+
+**Milestone 5 – Change Tracking**  
+Track when records change to support smarter sync decisions and reduce unnecessary operations; useful long-term, but intentionally deferred to avoid premature complexity.
