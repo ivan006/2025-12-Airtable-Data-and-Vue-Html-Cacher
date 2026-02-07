@@ -6,8 +6,6 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/../data-cache/CurlClient.php';
 require_once __DIR__ . '/../data-cache/helpers.php';
 
-
-
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, OPTIONS');
@@ -43,6 +41,12 @@ $env = json_decode(file_get_contents($envPath), true);
 
 /**
  * -------------------------------------------------
+ * SHARED: SOURCE FETCH
+ * -------------------------------------------------
+ */
+
+/**
+ * -------------------------------------------------
  * Routing
  * -------------------------------------------------
  */
@@ -62,9 +66,10 @@ if ($endpoint === 'configs-fetch') {
 
 /**
  * -------------------------------------------------
- * SOURCE FETCH (WordPress)
+ * SOURCE FETCH (refactored only)
  * -------------------------------------------------
- */ elseif ($endpoint === 'source-fetch') {
+ */
+elseif ($endpoint === 'source-fetch') {
 
   $entity = $_GET['entity'] ?? null;
   $id = $_GET['id'] ?? null;
@@ -75,71 +80,24 @@ if ($endpoint === 'configs-fetch') {
     exit;
   }
 
-  // Validate source entity
-  $allowed = false;
-  foreach ($env['entities'] as $e) {
-    if (($e['source_entity_name'] ?? null) === $entity) {
-      $allowed = true;
-      break;
-    }
-  }
-
-  if (!$allowed) {
-    http_response_code(404);
-    echo json_encode(['error' => 'Source entity not allowed']);
-    exit;
-  }
-
-  $baseUrl = rtrim($env['source']['base_url'], '/');
-  $url = $baseUrl . '/' . rawurlencode($entity) . '/' . rawurlencode($id);
-
-  $client = new CurlClient(false);
-  $bodyStream = fopen('php://temp', 'w+');
-
-  $info = $client->get($url, [], $bodyStream);
-
-  if (!$info || ($info['http_code'] ?? 500) >= 400) {
-    http_response_code(502);
-    echo json_encode([
-      'error' => 'Failed to fetch source record',
-      'http_code' => $info['http_code'] ?? null
-    ], JSON_PRETTY_PRINT);
-    exit;
-  }
-
-  rewind($bodyStream);
-  $data = json_decode(stream_get_contents($bodyStream), true);
-  fclose($bodyStream);
-
-  // Find entity mapping
-  $entityMap = null;
-  foreach ($env['entities'] as $e) {
-    if (($e['source_entity_name'] ?? null) === $entity) {
-      $entityMap = $e;
-      break;
-    }
-  }
-
-  $normData = $entityMap
-    ? normalizeStructure($data, $entityMap, 'source')
-    : [];
+  $result = fetchSource($env, $entity, $id);
 
   echo json_encode([
     'system' => 'source',
     'entity' => $entity,
     'id' => $id,
-    'norm_data' => $normData,
-    'raw_data' => $data
+    'norm_data' => $result['norm_data'],
+    'raw_data' => $result['raw_data']
   ], JSON_PRETTY_PRINT);
   exit;
-
 }
 
 /**
  * -------------------------------------------------
- * TARGET FETCH (Airtable)
+ * TARGET FETCH (UNCHANGED)
  * -------------------------------------------------
- */ elseif ($endpoint === 'target-fetch') {
+ */
+elseif ($endpoint === 'target-fetch') {
 
   $entity = $_GET['entity'] ?? null;
   $id = $_GET['id'] ?? null;
@@ -150,7 +108,6 @@ if ($endpoint === 'configs-fetch') {
     exit;
   }
 
-  // Validate target entity via env.json
   $entityMap = null;
   foreach ($env['entities'] as $e) {
     if (($e['target_entity_name'] ?? null) === $entity) {
@@ -165,7 +122,6 @@ if ($endpoint === 'configs-fetch') {
     exit;
   }
 
-  // Build Airtable URL
   $baseUrl = rtrim($env['target']['base_url'], '/');
   $baseId = $env['target']['base_id'];
   $table = $entityMap['target_entity_name'];
@@ -176,7 +132,6 @@ if ($endpoint === 'configs-fetch') {
     rawurlencode($table) . '/' .
     rawurlencode($id);
 
-  // Inject auth headers (host-based)
   $host = parse_url($url, PHP_URL_HOST);
   if (!isset($config[$host]['headers'])) {
     http_response_code(500);
@@ -189,7 +144,6 @@ if ($endpoint === 'configs-fetch') {
     $headers[] = $k . ': ' . $v;
   }
 
-  // Fetch
   $client = new CurlClient(false);
   $bodyStream = fopen('php://temp', 'w+');
 
@@ -230,15 +184,14 @@ if ($endpoint === 'configs-fetch') {
     'raw_data' => $data
   ], JSON_PRETTY_PRINT);
   exit;
-
 }
-
 
 /**
  * -------------------------------------------------
  * FALLBACK
  * -------------------------------------------------
- */ else {
+ */
+else {
   http_response_code(404);
   echo json_encode(['error' => 'Unknown endpoint']);
   exit;
